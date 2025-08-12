@@ -9,6 +9,7 @@ A modern web application for downloading and converting audio from various sourc
 - 📋 **Playlist Support**: Download entire playlists with one click
 - 🎨 **Modern UI**: Beautiful, responsive interface built with Next.js and Tailwind CSS
 - 🚀 **Vercel Ready**: Optimized for deployment on Vercel
+- 📁 **Smart Folder Selector**: Easy save location selection with common folders
 
 ## Tech Stack
 
@@ -157,9 +158,10 @@ CMD ["npm", "start"]
 ## Usage
 
 1. **Paste URL**: Enter a SoundCloud, YouTube, or other supported URL
-2. **Analyze**: Click "Analyze" to extract playlist/track information
-3. **Download**: Download individual tracks or entire playlists
-4. **Convert**: Audio is automatically converted to AIFF format with metadata
+2. **Select Save Location**: Choose from common folders or specify custom path
+3. **Analyze**: Click "Analyze" to extract playlist/track information
+4. **Download**: Download individual tracks or entire playlists
+5. **Convert**: Audio is automatically converted to AIFF format with metadata
 
 ## Supported Sites
 
