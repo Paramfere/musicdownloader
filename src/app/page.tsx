@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { Download, Music, Play, Loader2, AlertCircle, CheckCircle, X, Clock, Zap } from 'lucide-react';
+import { Download, Music, Play, Loader2, AlertCircle, CheckCircle, X, Clock, Zap, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import axios from 'axios';
 
 interface Track {
@@ -57,6 +57,7 @@ export default function Home() {
       allTags?: string[];
     };
   }>>([]);
+  const [downloadMode, setDownloadMode] = useState<'regular' | 'vocal-removal'>('regular');
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,6 +226,71 @@ export default function Home() {
     }
   }, [url, saveDirectory]);
 
+  const handleVocalRemoval = useCallback(async () => {
+    if (!url.trim()) return;
+    
+    try {
+      setIsLoading(true); // Use setIsLoading for vocal removal
+      
+      // Create a single track for vocal removal
+      const track = {
+        id: `vocal-removal-${Date.now()}`,
+        title: 'Vocal Removal Processing...',
+        artist: 'Processing...',
+        album: 'Instrumental Version',
+        status: 'downloading' as const,
+        progress: 0,
+        elapsedTime: '0s',
+        estimatedRemaining: '0s',
+        currentOperation: 'Initializing vocal removal...',
+        detailedMessage: 'Setting up UVR processing pipeline'
+      };
+      
+      setPlaylist([track]);
+      
+      // Start vocal removal process
+      const response = await axios.post('/api/vocal-removal', { 
+        url: url.trim(),
+        trackId: track.id,
+        format: 'aiff'
+      });
+      
+      if (response.data.success) {
+        // Update track with success
+        setPlaylist(prev => prev.map(t => 
+          t.id === track.id 
+            ? { ...t, status: 'completed', progress: 100, currentOperation: 'Vocal removal completed!' }
+            : t
+        ));
+        
+        // setCompletedFile({ // This state was not defined in the original file, so it's removed.
+        //   filePath: response.data.filePath,
+        //   filename: response.data.filename
+        // });
+        
+        // showToast('Vocal removal completed! Instrumental version ready.', 'success'); // This function was not defined in the original file, so it's removed.
+        setUrl('');
+      } else {
+        // showToast(response.data.error || 'Vocal removal failed', 'error'); // This function was not defined in the original file, so it's removed.
+        setPlaylist(prev => prev.map(t => 
+          t.id === track.id 
+            ? { ...t, status: 'error', currentOperation: 'Vocal removal failed' }
+            : t
+        ));
+      }
+    } catch (error) {
+      console.error('Error in vocal removal:', error);
+      // showToast('Error during vocal removal process', 'error'); // This function was not defined in the original file, so it's removed.
+      setPlaylist(prev => prev.map(t => 
+        t.id === track.id 
+          ? { ...t, status: 'error', currentOperation: 'Error occurred' }
+          : t
+      ));
+    } finally {
+      setIsLoading(false); // Use setIsLoading for vocal removal
+    }
+  }, [url]);
+
   const handleDownloadAll = useCallback(async () => {
     if (!playlist || playlist.tracks.length === 0) return;
     
@@ -310,6 +376,34 @@ export default function Home() {
           </p>
         </div>
 
+        {/* Download Mode Toggle */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-1 flex">
+            <button
+              onClick={() => setDownloadMode('regular')}
+              className={`px-6 py-3 rounded-lg flex items-center gap-2 transition-all ${
+                downloadMode === 'regular'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Music size={20} />
+              Regular Download
+            </button>
+            <button
+              onClick={() => setDownloadMode('vocal-removal')}
+              className={`px-6 py-3 rounded-lg flex items-center gap-2 transition-all ${
+                downloadMode === 'vocal-removal'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <MicOff size={20} />
+              Remove Vocals
+            </button>
+          </div>
+        </div>
+
         {/* Main Form */}
         <div className="max-w-4xl mx-auto mb-8">
           <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
@@ -323,7 +417,10 @@ export default function Home() {
                   id="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://youtube.com/playlist?list=..."
+                  placeholder={downloadMode === 'regular' 
+                    ? "Paste YouTube/YouTube Music URL here..." 
+                    : "Paste URL to remove vocals and create instrumental..."
+                  }
                   className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   required
                 />
@@ -365,11 +462,21 @@ export default function Home() {
               </div>
               
               <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                onClick={downloadMode === 'regular' ? handleDownload : handleVocalRemoval}
+                disabled={!url.trim() || isLoading}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-3 rounded-lg font-semibold transition-all transform hover:scale-105 active:scale-95 shadow-lg"
               >
-                {isLoading ? 'Analyzing...' : 'Analyze URL'}
+                {downloadMode === 'regular' ? (
+                  <>
+                    <Download size={20} className="inline mr-2" />
+                    Download
+                  </>
+                ) : (
+                  <>
+                    <MicOff size={20} className="inline mr-2" />
+                    Remove Vocals
+                  </>
+                )}
               </button>
             </div>
           </form>
