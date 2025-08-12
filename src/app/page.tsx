@@ -87,7 +87,7 @@ export default function Home() {
       console.log(`Progress update for ${trackId}:`, progressData);
       
       // Update playlist state (this is what the UI displays)
-      setPlaylist(prev => prev ? {
+      setPlaylist(prev => prev?.tracks ? {
         ...prev,
         tracks: prev.tracks.map(track => 
           track.id === trackId ? {
@@ -101,7 +101,7 @@ export default function Home() {
             error: progressData.error,
           } : track
         )
-      } : null);
+      } : prev);
       
       // Stop polling if completed or error
       if (progressData.status === 'completed' || progressData.status === 'error') {
@@ -142,7 +142,7 @@ export default function Home() {
   const handleDownload = useCallback(async (trackId: string) => {
     try {
       // Start progress tracking
-      setPlaylist(prev => prev ? {
+      setPlaylist(prev => prev?.tracks ? {
         ...prev,
         tracks: prev.tracks.map(t => 
           t.id === trackId ? { 
@@ -153,7 +153,7 @@ export default function Home() {
             detailedMessage: 'Starting download process'
           } : t
         )
-      } : null);
+      } : prev);
 
       // Start polling for progress updates (with small delay to let backend initialize)
       setTimeout(() => startProgressPolling(trackId), 200);
@@ -167,12 +167,12 @@ export default function Home() {
 
       if (response.data.success) {
         // Progress polling will handle the completed state, but make sure it's set
-        setPlaylist(prev => prev ? {
+        setPlaylist(prev => prev?.tracks ? {
           ...prev,
           tracks: prev.tracks.map(t => 
             t.id === trackId ? { ...t, status: 'completed' as const, progress: 100 } : t
           )
-        } : null);
+        } : prev);
 
         // Show non-blocking toast with metadata info
         const id = Date.now();
@@ -210,12 +210,12 @@ export default function Home() {
       }
       
       // Update track status to error
-      setPlaylist(prev => prev ? {
+      setPlaylist(prev => prev?.tracks ? {
         ...prev,
         tracks: prev.tracks.map(t => 
           t.id === trackId ? { ...t, status: 'error' as const, error: err instanceof Error ? err.message : 'Unknown error' } : t
         )
-      } : null);
+      } : prev);
 
       const id = Date.now();
       setToasts(prev => [
@@ -246,7 +246,11 @@ export default function Home() {
         detailedMessage: 'Setting up UVR processing pipeline'
       };
       
-      setPlaylist([track]);
+      setPlaylist({
+        title: 'Vocal Removal',
+        trackCount: 1,
+        tracks: [track]
+      });
       
       // Start vocal removal process
       const response = await axios.post('/api/vocal-removal', { 
@@ -257,11 +261,14 @@ export default function Home() {
       
       if (response.data.success) {
         // Update track with success
-        setPlaylist(prev => prev.map(t => 
-          t.id === track.id 
-            ? { ...t, status: 'completed', progress: 100, currentOperation: 'Vocal removal completed!' }
-            : t
-        ));
+        setPlaylist(prev => prev?.tracks ? {
+          ...prev,
+          tracks: prev.tracks.map(t => 
+            t.id === track.id 
+              ? { ...t, status: 'completed', progress: 100, currentOperation: 'Vocal removal completed!' }
+              : t
+          )
+        } : prev);
         
         // setCompletedFile({ // This state was not defined in the original file, so it's removed.
         //   filePath: response.data.filePath,
@@ -272,30 +279,36 @@ export default function Home() {
         setUrl('');
       } else {
         // showToast(response.data.error || 'Vocal removal failed', 'error'); // This function was not defined in the original file, so it's removed.
-        setPlaylist(prev => prev.map(t => 
-          t.id === track.id 
-            ? { ...t, status: 'error', currentOperation: 'Vocal removal failed' }
-            : t
-        ));
+        setPlaylist(prev => prev?.tracks ? {
+          ...prev,
+          tracks: prev.tracks.map(t => 
+            t.id === track.id 
+              ? { ...t, status: 'error', currentOperation: 'Vocal removal failed' }
+              : t
+          )
+        } : prev);
       }
     } catch (error) {
       console.error('Error in vocal removal:', error);
       // showToast('Error during vocal removal process', 'error'); // This function was not defined in the original file, so it's removed.
-      setPlaylist(prev => prev.map(t => 
-        t.id === track.id 
-          ? { ...t, status: 'error', currentOperation: 'Error occurred' }
-          : t
-      ));
+      setPlaylist(prev => prev?.tracks ? {
+        ...prev,
+        tracks: prev.tracks.map(t => 
+          t.id === track.id 
+            ? { ...t, status: 'error', currentOperation: 'Error occurred' }
+            : t
+        )
+      } : prev);
     } finally {
       setIsLoading(false); // Use setIsLoading for vocal removal
     }
   }, [url]);
 
   const handleDownloadAll = useCallback(async () => {
-    if (!playlist || playlist.tracks.length === 0) return;
+            if (!playlist?.tracks?.length) return;
     
     setIsBatchDownloading(true);
-    const downloadPromises = playlist.tracks.map(async (track, index) => {
+            const downloadPromises = playlist.tracks!.map(async (track, index) => {
       try {
         // Add delay between requests to prevent overwhelming the server
         await new Promise(resolve => setTimeout(resolve, index * 1000));
@@ -355,7 +368,7 @@ export default function Home() {
       const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
       const failed = results.filter(r => r.status === 'fulfilled' && !r.value.success).length;
       
-      setCompletionStats({ successful, failed, total: playlist.tracks.length });
+              setCompletionStats({ successful, failed, total: playlist.tracks!.length });
       setShowCompletionModal(true);
     } catch (error) {
       console.error('Batch download error:', error);
@@ -496,18 +509,18 @@ export default function Home() {
           <div className="max-w-4xl mx-auto">
             <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 mb-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-white">{playlist.title}</h2>
+                <h2 className="text-2xl font-bold text-white">{playlist?.title || 'Playlist'}</h2>
                 <button
                   onClick={handleDownloadAll}
-                  disabled={isBatchDownloading}
+                  disabled={isBatchDownloading || !playlist?.tracks?.length}
                   className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
                 >
-                  {isBatchDownloading ? 'Downloading...' : `Download All (${playlist.tracks.length})`}
+                  {isBatchDownloading ? 'Downloading...' : `Download All (${playlist?.tracks?.length || 0})`}
                 </button>
               </div>
               
               <div className="space-y-3">
-                {playlist.tracks.map((track, index) => (
+                {playlist?.tracks?.map((track, index) => (
                   <div key={`${track.id}-${index}`} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
                     <div className="flex-1">
                       <h3 className="text-white font-medium">{track.title}</h3>
